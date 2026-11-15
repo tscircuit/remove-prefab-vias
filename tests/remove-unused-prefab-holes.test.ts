@@ -483,6 +483,71 @@ describe("removeUnusedPrefabHoles", () => {
 			}),
 		).toThrow("coordinateTolerance must be a positive finite number");
 	});
+
+	test("skips pcb_trace entries that omit route instead of throwing", () => {
+		const clad = [
+			{
+				type: "pcb_plated_hole",
+				pcb_plated_hole_id: "clad_hole",
+				pcb_port_id: "clad_port",
+				shape: "circle",
+				x: 0,
+				y: 0,
+				hole_diameter: 1,
+				outer_diameter: 1.6,
+				layers: ["top", "bottom"],
+			},
+			{
+				type: "pcb_trace",
+				pcb_trace_id: "clad_unrouted",
+			},
+		] as CircuitJson;
+		const final = [
+			{
+				type: "pcb_plated_hole",
+				pcb_plated_hole_id: "final_hole",
+				pcb_port_id: "final_port",
+				shape: "circle",
+				x: 0,
+				y: 0,
+				hole_diameter: 1,
+				outer_diameter: 1.6,
+				layers: ["top", "bottom"],
+			},
+			{
+				type: "pcb_trace",
+				pcb_trace_id: "final_unrouted",
+			},
+			{
+				type: "pcb_trace",
+				pcb_trace_id: "circuit_trace_to_hole",
+				route: [
+					{ route_type: "wire", x: -2, y: 0, width: 0.1, layer: "top" },
+					{
+						route_type: "wire",
+						x: 0,
+						y: 0,
+						width: 0.1,
+						layer: "top",
+						end_pcb_port_id: "final_port",
+					},
+				],
+			},
+		] as CircuitJson;
+
+		const result = removeUnusedPrefabHoles(clad, final);
+
+		expect(result.matchedCladHoleCount).toBe(1);
+		expect(result.preservedUsedCladHoleCount).toBe(1);
+		expect(result.removedUnusedCladHoleCount).toBe(0);
+		expect(result.matchedCladTraceCount).toBe(0);
+		expect(result.unmatchedCladTraceCount).toBe(1);
+		expect(
+			result.circuitJson
+				.filter((element) => element.type === "pcb_trace")
+				.map((trace) => trace.pcb_trace_id),
+		).toEqual(["final_unrouted", "circuit_trace_to_hole"]);
+	});
 });
 
 describe("parseCircuitJson", () => {

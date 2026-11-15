@@ -196,20 +196,26 @@ const reverseTracePoint = (point: JsonRecord): JsonRecord => {
 	return point;
 };
 
+const getTraceRoute = (trace: PcbTrace): PcbTrace["route"] =>
+	Array.isArray(trace.route) ? trace.route : [];
+
 const tracesMatch = (
 	left: PcbTrace,
 	right: PcbTrace,
 	tolerance: number,
 ): boolean => {
+	if (!Array.isArray(left.route) || !Array.isArray(right.route)) return false;
 	if (left.route.length !== right.route.length) return false;
-	const leftRoute = left.route.map(normalizeTracePoint);
-	const rightRoute = right.route.map(normalizeTracePoint);
-	if (approximatelyEqual(leftRoute, rightRoute, tolerance)) return true;
+	const leftNormalized = left.route.map(normalizeTracePoint);
+	const rightNormalized = right.route.map(normalizeTracePoint);
+	if (approximatelyEqual(leftNormalized, rightNormalized, tolerance)) {
+		return true;
+	}
 
-	const reversedRightRoute = [...rightRoute]
+	const reversedRightRoute = [...rightNormalized]
 		.reverse()
 		.map(reverseTracePoint);
-	return approximatelyEqual(leftRoute, reversedRightRoute, tolerance);
+	return approximatelyEqual(leftNormalized, reversedRightRoute, tolerance);
 };
 
 const getPoint = (value: unknown): Point | undefined => {
@@ -248,7 +254,7 @@ const addReferencedHoleIndices = ({
 	platedHoleIdToHoleIndex: Map<string, number>;
 	usedHoleIndices: Set<number>;
 }): void => {
-	for (const point of trace.route) {
+	for (const point of getTraceRoute(trace)) {
 		if (point.route_type === "wire") {
 			if (point.start_pcb_port_id) {
 				const index = portIdToHoleIndex.get(point.start_pcb_port_id);
@@ -438,7 +444,7 @@ export const removeUnusedPrefabHoles = (
 			usedHoleIndices,
 		});
 
-		const routePoints: Point[] = trace.route.flatMap(
+		const routePoints: Point[] = getTraceRoute(trace).flatMap(
 			(point: PcbTrace["route"][number]) => getRoutePoints(point),
 		);
 
@@ -453,7 +459,7 @@ export const removeUnusedPrefabHoles = (
 			}
 		}
 
-		for (const point of trace.route) {
+		for (const point of getTraceRoute(trace)) {
 			if (point.route_type !== "via") continue;
 			for (const matchedHole of matchedConductiveHoles) {
 				if (
